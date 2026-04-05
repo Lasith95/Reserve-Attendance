@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Attendance</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#28a745">
+  <link rel="apple-touch-icon" href="logo.png">
+  
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
+    .logo { width: 80px; height: 80px; border-radius: 50%; margin-bottom: 15px; object-fit: cover; }
+    h2 { color: #1c1e21; margin-top: 0; margin-bottom: 20px; }
+    input { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; font-size: 18px; box-sizing: border-box; text-align: center; }
+    button { width: 100%; padding: 12px; margin: 8px 0; border: none; border-radius: 8px; color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .btn-p { background-color: #28a745; }
+    .btn-do { background-color: #ffc107; color: #333; }
+    .btn-sl { background-color: #dc3545; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    #status { margin-top: 20px; font-size: 14px; font-weight: 500; min-height: 40px; }
+    .loading { color: #007bff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="logo.png" alt="Shop Logo" class="logo" onerror="this.style.display='none'">
+    <h2>Staff Attendance</h2>
+    <input type="password" id="pinInput" placeholder="Enter Your PIN" pattern="\[0-9\]*" inputmode="numeric">
+    
+    <button class="btn-p" onclick="handleAction('P')">CLOCK IN (Present)</button>
+    <button class="btn-do" onclick="handleAction('DO')">DAY OFF (DO)</button>
+    <button class="btn-sl" onclick="handleAction('SL')">SICK LEAVE (SL)</button>
+    
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // Paste your Google Apps Script Web App URL here
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwipIPHWJBvBWc81Am5nHLl7BWlBBk1Cip28G2CasYJAkrTOMsCsDeEmxEqwM0eId05Pw/exec";
+
+    async function getPublicIp() {
+      try {
+        const response = await fetch('https://api64.ipify.org?format=json');
+        const data = await response.json();
+        return data.ip;
+      } catch (err) {
+        return "Unknown";
+      }
+    }
+
+    async function handleAction(actionType) {
+      const pin = document.getElementById('pinInput').value;
+      const statusDiv = document.getElementById('status');
+      const buttons = document.querySelectorAll('button');
+
+      if (!pin) {
+        statusDiv.style.color = "red";
+        statusDiv.innerText = "Please enter your PIN.";
+        return;
+      }
+
+      buttons.forEach(b => b.disabled = true);
+      statusDiv.className = "loading";
+      statusDiv.style.color = "#007bff";
+      statusDiv.innerText = "Verifying details...";
+
+      const userIp = await getPublicIp();
+      const payload = { pin: pin, action: actionType, userIp: userIp };
+
+      try {
+        const response = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          // text/plain is used to avoid CORS preflight issues with Google Apps Script
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        
+        const resultText = await response.text();
+        
+        statusDiv.className = "";
+        statusDiv.style.color = resultText.includes("Success") ? "green" : "red";
+        statusDiv.innerText = resultText;
+        
+        if (resultText.includes("Success")) {
+          document.getElementById('pinInput').value = "";
+        }
+      } catch (error) {
+        statusDiv.className = "";
+        statusDiv.style.color = "red";
+        statusDiv.innerText = "Network Error. Please try again.";
+      } finally {
+        buttons.forEach(b => b.disabled = false);
+      }
+    }
+
+    // PWA Service Worker Registration (Required for Add to Home Screen in some browsers)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(err => console.log("SW Register Failed", err));
+    }
+  </script>
+</body>
+</html>
